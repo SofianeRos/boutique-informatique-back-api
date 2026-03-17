@@ -56,9 +56,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Order::class, mappedBy: 'user', orphanRemoval: true)]
     private Collection $orders;
 
+    /**
+     * @var Collection<int, SAV>
+     */
+    #[ORM\OneToMany(targetEntity: SAV::class, mappedBy: 'user', orphanRemoval: true)]
+    private Collection $savs;
+
+    /**
+     * @var Collection<int, Event>
+     */
+    #[ORM\ManyToMany(targetEntity: Event::class, mappedBy: 'users')]
+    private Collection $events;
+
     public function __construct()
     {
         $this->orders = new ArrayCollection();
+        $this->savs = new ArrayCollection();
+        $this->events = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -227,6 +241,63 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             if ($order->getUser() === $this) {
                 $order->setUser(null);
             }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, SAV>
+     */
+    public function getSavs(): Collection
+    {
+        return $this->savs;
+    }
+
+    public function addSav(SAV $sav): static
+    {
+        if (!$this->savs->contains($sav)) {
+            $this->savs->add($sav);
+            $sav->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeSav(SAV $sav): static
+    {
+        if ($this->savs->removeElement($sav)) {
+            // set the owning side to null (unless already changed)
+            if ($sav->getUser() === $this) {
+                $sav->setUser(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Event>
+     */
+    public function getEvents(): Collection
+    {
+        return $this->events;
+    }
+
+    public function addEvent(Event $event): static
+    {
+        if (!$this->events->contains($event)) {
+            $this->events->add($event);
+            $event->addUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeEvent(Event $event): static
+    {
+        if ($this->events->removeElement($event)) {
+            $event->removeUser($this);
         }
 
         return $this;
