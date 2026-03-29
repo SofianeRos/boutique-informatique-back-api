@@ -19,8 +19,7 @@ class AppFixtures extends Fixture
 
     public function load(ObjectManager $manager): void
     {
-        // ... (le reste du code avec le User et le Product)
-        // 1. Création d'un faux compte Client
+        // 1. Création d'un faux compte Client (Celui qui n'a pas le droit de supprimer)
         $user = new User();
         $user->setEmail('client@test.com');
         $user->setRoles(['ROLE_USER']);
@@ -32,7 +31,19 @@ class AppFixtures extends Fixture
 
         $manager->persist($user);
 
-        // 2. Création de 10 faux Produits
+        // 👑 2. Création du compte Administrateur
+        $admin = new User();
+        $admin->setEmail('admin@test.com');
+        $admin->setRoles(['ROLE_ADMIN']); // <--- LE FAMEUX BADGE VIP
+        $admin->setPassword($this->hasher->hashPassword($admin, 'azerty'));
+        $admin->setPseudo('SuperAdmin');
+        $admin->setAdresse('1 Place de la Matrice, 75000 Paris');
+        $admin->setCreatedAt(new \DateTime());
+        $admin->setIsActive(true);
+
+        $manager->persist($admin);
+
+        // 3. Création de 10 faux Produits
         for ($i = 1; $i <= 10; $i++) {
             $product = new Product();
             $product->setNom('PC Gamer Edition Mega ' . $i);

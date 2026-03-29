@@ -6,72 +6,62 @@ use ApiPlatform\Metadata\ApiResource;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Serializer\Attribute\Groups;
 
-#[ApiResource]
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[ApiResource(
+    normalizationContext: ['groups' => ['user:read']],
+    denormalizationContext: ['groups' => ['user:write']]
+)]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['user:read'])]
     private ?int $id = null;
 
-    #[ORM\Column(length: 180)]
+    #[ORM\Column(length: 180, unique: true)]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $email = null;
 
-    /**
-     * @var list<string> The user roles
-     */
     #[ORM\Column]
     private array $roles = [];
 
-    /**
-     * @var string The hashed password
-     */
     #[ORM\Column]
+    #[Groups(['user:write'])]
     private ?string $password = null;
 
+    // --- VOICI LES CHAMPS QU'ON AVAIT PERDUS ---
+
     #[ORM\Column(length: 255)]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $pseudo = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $adresse = null;
 
-    #[ORM\Column]
-    private ?\DateTime $createdAt = null;
-
-    #[ORM\Column(nullable: true)]
-    private ?\DateTime $updatedAt = null;
+    #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    #[Groups(['user:read'])]
+    private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column]
+    #[Groups(['user:read'])]
     private ?bool $isActive = null;
 
-    /**
-     * @var Collection<int, Order>
-     */
-    #[ORM\OneToMany(targetEntity: Order::class, mappedBy: 'user', orphanRemoval: true)]
-    private Collection $orders;
+    // ------------------------------------------
 
-    /**
-     * @var Collection<int, SAV>
-     */
-    #[ORM\OneToMany(targetEntity: SAV::class, mappedBy: 'user', orphanRemoval: true)]
-    private Collection $savs;
-
-    /**
-     * @var Collection<int, Event>
-     */
     #[ORM\ManyToMany(targetEntity: Event::class, mappedBy: 'users')]
     private Collection $events;
 
     public function __construct()
     {
-        $this->orders = new ArrayCollection();
-        $this->savs = new ArrayCollection();
         $this->events = new ArrayCollection();
     }
 
@@ -88,45 +78,27 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmail(string $email): static
     {
         $this->email = $email;
-
         return $this;
     }
 
-    /**
-     * A visual identifier that represents this user.
-     *
-     * @see UserInterface
-     */
     public function getUserIdentifier(): string
     {
         return (string) $this->email;
     }
 
-    /**
-     * @see UserInterface
-     */
     public function getRoles(): array
     {
         $roles = $this->roles;
-        // guarantee every user at least has ROLE_USER
         $roles[] = 'ROLE_USER';
-
         return array_unique($roles);
     }
 
-    /**
-     * @param list<string> $roles
-     */
     public function setRoles(array $roles): static
     {
         $this->roles = $roles;
-
         return $this;
     }
 
-    /**
-     * @see PasswordAuthenticatedUserInterface
-     */
     public function getPassword(): ?string
     {
         return $this->password;
@@ -135,26 +107,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPassword(string $password): static
     {
         $this->password = $password;
-
         return $this;
     }
 
-    /**
-     * Ensure the session doesn't contain actual password hashes by CRC32C-hashing them, as supported since Symfony 7.3.
-     */
-    public function __serialize(): array
-    {
-        $data = (array) $this;
-        $data["\0".self::class."\0password"] = hash('crc32c', $this->password);
+    public function eraseCredentials(): void {}
 
-        return $data;
-    }
-
-    #[\Deprecated]
-    public function eraseCredentials(): void
-    {
-        // @deprecated, to be removed when upgrading to Symfony 8
-    }
+    // --- LES GETTERS ET SETTERS RETROUVÉS ---
 
     public function getPseudo(): ?string
     {
@@ -164,7 +122,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPseudo(string $pseudo): static
     {
         $this->pseudo = $pseudo;
-
         return $this;
     }
 
@@ -176,31 +133,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setAdresse(?string $adresse): static
     {
         $this->adresse = $adresse;
-
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTime
+    public function getCreatedAt(): ?\DateTimeInterface
     {
         return $this->createdAt;
     }
 
-    public function setCreatedAt(\DateTime $createdAt): static
+    public function setCreatedAt(\DateTimeInterface $createdAt): static
     {
         $this->createdAt = $createdAt;
-
-        return $this;
-    }
-
-    public function getUpdatedAt(): ?\DateTime
-    {
-        return $this->updatedAt;
-    }
-
-    public function setUpdatedAt(?\DateTime $updatedAt): static
-    {
-        $this->updatedAt = $updatedAt;
-
         return $this;
     }
 
@@ -212,73 +155,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setIsActive(bool $isActive): static
     {
         $this->isActive = $isActive;
-
         return $this;
     }
 
-    /**
-     * @return Collection<int, Order>
-     */
-    public function getOrders(): Collection
-    {
-        return $this->orders;
-    }
+    // ----------------------------------------
 
-    public function addOrder(Order $order): static
-    {
-        if (!$this->orders->contains($order)) {
-            $this->orders->add($order);
-            $order->setUser($this);
-        }
-
-        return $this;
-    }
-
-    public function removeOrder(Order $order): static
-    {
-        if ($this->orders->removeElement($order)) {
-            // set the owning side to null (unless already changed)
-            if ($order->getUser() === $this) {
-                $order->setUser(null);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, SAV>
-     */
-    public function getSavs(): Collection
-    {
-        return $this->savs;
-    }
-
-    public function addSav(SAV $sav): static
-    {
-        if (!$this->savs->contains($sav)) {
-            $this->savs->add($sav);
-            $sav->setUser($this);
-        }
-
-        return $this;
-    }
-
-    public function removeSav(SAV $sav): static
-    {
-        if ($this->savs->removeElement($sav)) {
-            // set the owning side to null (unless already changed)
-            if ($sav->getUser() === $this) {
-                $sav->setUser(null);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Event>
-     */
     public function getEvents(): Collection
     {
         return $this->events;
@@ -290,7 +171,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->events->add($event);
             $event->addUser($this);
         }
-
         return $this;
     }
 
@@ -299,7 +179,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         if ($this->events->removeElement($event)) {
             $event->removeUser($this);
         }
-
         return $this;
     }
 }
